@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "MeasureHighResolutionTimer": {
+      "commandName": "Project",
+      "commandLineArgs": "12"
+    }
+  }
+}
