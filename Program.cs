@@ -7,7 +7,7 @@ namespace MeasureHighResolutionTimer;
 
 internal class Program
 {
-    private static readonly object ConsoleLock = new();
+    private static SpinLock ConsoleLock;
     private static double[] _deltaTimes = null!;
     private static long[] _frequency = null!;
     private static int _run = 1;
@@ -57,14 +57,23 @@ internal class Program
     private static void DisplayAllDeltas()
     {
         StringBuilder sb = new();
-        lock (ConsoleLock)
+        var lockTaken = false;
+
+        try
         {
+            ConsoleLock.Enter(ref lockTaken);
+
             sb.AppendLine($"Run {_run}");
             for (var i = 0; i < _deltaTimes.Length; i++)
                 sb.AppendLine($"Core {i} - Delta {_deltaTimes[i]} - Frequency {_frequency[i]}");
+
+            File.AppendAllTextAsync("data.txt", sb.ToString()).Wait();
             Console.WriteLine(sb.ToString());
-            File.AppendAllText("data.txt", sb.ToString());
             _run++;
+        }
+        finally
+        {
+            if (lockTaken) ConsoleLock.Exit();
         }
     }
 }
@@ -94,6 +103,9 @@ public partial class HighResolutionTimer
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool QueryPerformanceFrequency(out long lpFrequency);
 
+    [LibraryImport("ntdll.dll")]
+    private static partial int NtYieldExecution();
+
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public double GetDeltaTime()
@@ -112,7 +124,7 @@ public partial class HighResolutionTimer
             if (sleepDuration - stopwatch.Elapsed > TimeSpan.FromMilliseconds(1))
                 Thread.Sleep(1);
             else
-                Thread.Yield();
+                NtYieldExecution();
     }
 }
 
